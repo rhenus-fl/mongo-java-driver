@@ -49,6 +49,21 @@ public class DBCollectionTest extends TestCase {
     }
 
     @Test(groups = {"basic"})
+    public void testMultiTokenizedKeyDBObjectInsert() {
+        DBCollection c = _db.getCollection("testmultiinsert");
+        c.drop();
+
+        DBObject obj = c.findOne();
+        assertEquals(obj, null);
+
+        DBObject inserted1 = TokenizedKeyDBObjectBuilder.start().add("x",1).add("y",2).get();
+        DBObject inserted2 = TokenizedKeyDBObjectBuilder.start().add("x",3).add("y",3).get();
+        c.insert(inserted1,inserted2);
+        c.insert(new DBObject[] {inserted1,inserted2});
+    }
+
+    
+    @Test(groups = {"basic"})
     public void testDuplicateKeyException() {
         DBCollection c = _db.getCollection("testDuplicateKey");
         c.drop();
@@ -103,6 +118,50 @@ public class DBCollectionTest extends TestCase {
         assertEquals(obj.get("y"), 2);
 
         obj = c.findOne(new BasicDBObject("x", 1), new BasicDBObject("y", 1));
+        assertEquals(obj.containsField("x"), false);
+        assertEquals(obj.get("y"), 2);
+    }
+    
+    
+    @Test(groups = {"basic"})
+    public void testFindOneTokenizedKeyDBObject() {
+        DBCollection c = _db.getCollection("test");
+        c.drop();
+
+        DBObject obj = c.findOne();
+        assertEquals(obj, null);
+
+        obj = c.findOne();
+        assertEquals(obj, null);
+
+        obj = c.findOne();
+        assertEquals(obj, null);
+
+        // Test that findOne works when fields is specified but no match is found
+        // *** This is a Regression test for JAVA-411 ***
+        obj = c.findOne(null, new TokenizedKeyDBObject("_id", true));
+
+        assertEquals(obj, null);
+
+        DBObject inserted = TokenizedKeyDBObjectBuilder.start().add("x",1).add("y",2).get();
+        c.insert(inserted);
+        c.insert(TokenizedKeyDBObjectBuilder.start().add("_id", 123).add("x",2).add("z",2).get());
+
+        obj = c.findOne(new TokenizedKeyDBObject("_id",123));
+        assertEquals(obj.get("_id"), 123);
+        assertEquals(obj.get("x"), 2);
+        assertEquals(obj.get("z"), 2);
+
+        obj = c.findOne(new TokenizedKeyDBObject("_id",123), new TokenizedKeyDBObject("x", 1));
+        assertEquals(obj.get("_id"), 123);
+        assertEquals(obj.get("x"), 2);
+        assertEquals(obj.containsField("z"), false);
+
+        obj = c.findOne(new TokenizedKeyDBObject("x", 1));
+        assertEquals(obj.get("x"), 1);
+        assertEquals(obj.get("y"), 2);
+
+        obj = c.findOne(new TokenizedKeyDBObject("x", 1), new TokenizedKeyDBObject("y", 1));
         assertEquals(obj.containsField("x"), false);
         assertEquals(obj.get("y"), 2);
     }

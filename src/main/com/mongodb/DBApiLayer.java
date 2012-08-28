@@ -36,13 +36,15 @@ import org.bson.types.ObjectId;
 
 import com.mongodb.util.JSON;
 
+
 /** Database API
  * This cannot be directly instantiated, but the functions are available
  * through instances of Mongo.
  */
 public class DBApiLayer extends DB {
-
-    static final boolean D = Boolean.getBoolean( "DEBUG.DB" );
+    
+    TokenConverter converter;
+    
     /** The maximum number of cursors allowed */
     static final int NUM_CURSORS_BEFORE_KILL = 100;
     static final int NUM_CURSORS_PER_BATCH = 20000;
@@ -98,6 +100,8 @@ public class DBApiLayer extends DB {
         _rootPlusDot = _root + ".";
 
         _connector = connector;
+        
+        converter = new TokenConverter(_mongo);
     }
 
     public void requestStart(){
@@ -249,6 +253,9 @@ public class DBApiLayer extends DB {
 
                 for ( ; cur<arr.length; cur++ ){
                     DBObject o = arr[cur];
+                    
+                    converter.transformAttrs(o, true);
+                    
                     om.putObject( o );
 
                     // limit for batch insert is 4 x maxbson on server, use 2 x to be safe
@@ -305,6 +312,9 @@ public class DBApiLayer extends DB {
             if ( ref == null )
                 ref = new BasicDBObject();
 
+            converter.transformAttrs(ref, true);
+            converter.transformAttrs(fields, true);
+            
             if ( willTrace() ) trace( "find: " + _fullNameSpace + " " + JSON.serialize( ref ) );
 
             OutMessage query = OutMessage.query( _mongo , options , _fullNameSpace , numToSkip , chooseBatchSize(batchSize, limit, 0) , ref , fields, readPref,
@@ -329,7 +339,9 @@ public class DBApiLayer extends DB {
             if (encoder == null)
                 encoder = DefaultDBEncoder.FACTORY.create();
 
-            if (o != null && !o.keySet().isEmpty()) {
+            if (!o.keySet().isEmpty()) {
+                converter.transformAttrs(o, true);
+                
                 // if 1st key doesn't start with $, then object will be inserted as is, need to check it
                 String key = o.keySet().iterator().next();
                 if (!key.startsWith("$"))
@@ -338,6 +350,8 @@ public class DBApiLayer extends DB {
 
             if ( willTrace() ) trace( "update: " + _fullNameSpace + " " + JSON.serialize( query ) + " " + JSON.serialize( o )  );
 
+			converter.transformAttrs(query, true);
+			
             OutMessage om = new OutMessage( _mongo , 2001, encoder );
             om.writeInt( 0 ); // reserved
             om.writeCString( _fullNameSpace );
@@ -371,6 +385,29 @@ public class DBApiLayer extends DB {
         }
 
         final String _fullNameSpace;
+
+        @Override
+        public DBCursor find(DBObject ref) {
+            if(ref==null||!ref.containsField(TokenConverter.TOKENIZE))
+                return super.find(ref);
+            else 
+                return new TokenizedDBCursor( this, ref, null, getReadPreference(), converter);
+        }
+
+        @Override
+        public DBCursor find(DBObject ref, DBObject keys) {
+            if(ref==null||keys==null||(!ref.containsField(TokenConverter.TOKENIZE) && !ref.containsField(TokenConverter.TOKENIZE)))
+                return super.find(ref, keys);
+            else 
+                return new TokenizedDBCursor( this, ref, keys, getReadPreference(), converter);
+        }
+
+        @Override
+        public DBCursor find() {
+            return new TokenizedDBCursor( this, null, null, getReadPreference(), converter);
+        }
+        
+        
     }
 
     class Result implements Iterator<DBObject> {
@@ -404,7 +441,11 @@ public class DBApiLayer extends DB {
 
         public DBObject next(){
             if ( _cur.hasNext() ) {
-                return _cur.next();
+                DBObject ret = _cur.next();
+                
+                converter.transformAttrs(ret, false);
+                
+                return ret;
             }
 
             if ( ! _curResult.hasGetMore( _options ) )

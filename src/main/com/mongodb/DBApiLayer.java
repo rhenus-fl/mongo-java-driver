@@ -388,18 +388,12 @@ public class DBApiLayer extends DB {
 
         @Override
         public DBCursor find(DBObject ref) {
-            if(ref==null||!ref.containsField(TokenConverter.TOKENIZE))
-                return super.find(ref);
-            else 
-                return new TokenizedDBCursor( this, ref, null, getReadPreference(), converter);
+            return new TokenizedDBCursor( this, ref, null, getReadPreference(), converter);
         }
 
         @Override
         public DBCursor find(DBObject ref, DBObject keys) {
-            if(ref==null||keys==null||(!ref.containsField(TokenConverter.TOKENIZE) && !ref.containsField(TokenConverter.TOKENIZE)))
-                return super.find(ref, keys);
-            else 
-                return new TokenizedDBCursor( this, ref, keys, getReadPreference(), converter);
+            return new TokenizedDBCursor( this, ref, keys, getReadPreference(), converter);
         }
 
         @Override

@@ -166,43 +166,34 @@ public class DBCollectionTest extends TestCase {
         assertEquals(obj.get("y"), 2);
     }
     
-    @Test
-    public void testFindOneSort(){
-    	
-    	DBCollection c = _db.getCollection("test");
-    	c.drop();
-    	
-        DBObject obj = c.findOne();
-        assertEquals(obj, null);
+    @Test(groups = {"basic"})
+    public void testFindTokenizedKeyDBObject() {
+        DBCollection c = _db.getCollection("test");
+        c.drop();
 
-        c.insert(BasicDBObjectBuilder.start().add("_id", 1).add("x", 100).add("y", "abc").get());
-        c.insert(BasicDBObjectBuilder.start().add("_id", 2).add("x", 200).add("y", "abc").get()); //max x
-        c.insert(BasicDBObjectBuilder.start().add("_id", 3).add("x", 1).add("y", "abc").get());
-        c.insert(BasicDBObjectBuilder.start().add("_id", 4).add("x", -100).add("y", "xyz").get()); //min x
-        c.insert(BasicDBObjectBuilder.start().add("_id", 5).add("x", -50).add("y", "zzz").get());  //max y
-        c.insert(BasicDBObjectBuilder.start().add("_id", 6).add("x", 9).add("y", "aaa").get());  //min y
-        c.insert(BasicDBObjectBuilder.start().add("_id", 7).add("x", 1).add("y", "bbb").get());
-      
-        //only sort
-        obj = c.findOne(new BasicDBObject(),  new BasicDBObject("x", 1) );
-        assertNotNull(obj);
-        assertEquals(4, obj.get("_id"));
+        DBCursor obj = c.find();
+        assertEquals(obj.hasNext(), false);
         
-        obj = c.findOne(new BasicDBObject(),  new BasicDBObject("x", -1));
-        assertNotNull(obj);
-        assertEquals(obj.get("_id"), 2);
-        
-        //query and sort
-        obj = c.findOne(new BasicDBObject("x", 1),  BasicDBObjectBuilder.start().add("x", 1).add("y", 1).get() );
-        assertNotNull(obj);
-        assertEquals(obj.get("_id"), 3);
-        
-        obj = c.findOne( QueryBuilder.start("x").lessThan(2).get(),  BasicDBObjectBuilder.start().add("y", -1).get() );
-        assertNotNull(obj);
-        assertEquals(obj.get("_id"), 5);
-        
+        obj = c.find(null, new TokenizedKeyDBObject("_id", true));
+        assertEquals(obj.hasNext(), false);
+
+        DBObject inserted = TokenizedKeyDBObjectBuilder.start().add("x",1).add("y",2).get();
+        c.insert(inserted);
+        c.insert(TokenizedKeyDBObjectBuilder.start().add("_id", 123).add("x",2).add("z",2).get());
+
+        obj = c.find(new TokenizedKeyDBObject("x", 1));
+        DBObject dbo = obj.next();
+        assertEquals(dbo.get("x"), 1);
+        assertEquals(dbo.get("y"), 2);
+
+        obj = c.find(new TokenizedKeyDBObject("x", 1), new TokenizedKeyDBObject("y", 1));
+        dbo = obj.next();
+        assertEquals(dbo.containsField("x"), false);
+        assertEquals(dbo.get("y"), 2);
     }
-
+    
+    
+   
     /**
      * This was broken recently. Adding test.
      */

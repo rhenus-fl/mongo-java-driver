@@ -250,6 +250,51 @@ public class DBCursorTest extends TestCase {
         assertEquals( 5 , _count( c.find( null , null).skip(  0 ).batchSize( -5 ) ) );
     }
 
+    @Test
+    public void testBig2(){
+        DBCollection c = _db.getCollection("big1");
+        c.drop();
+
+        String bigString;
+        {
+            StringBuilder buf = new StringBuilder( 16000 );
+            for ( int i=0; i<16000; i++ )
+                buf.append( "x" );
+            bigString = buf.toString();
+        }
+
+        int numToInsert = ( 15 * 1024 * 1024 ) / bigString.length();
+
+        for ( int i=0; i<numToInsert; i++ )
+            c.save( TokenizedKeyDBObjectBuilder.start().add( "x" , i ).add( "s" , bigString ).get() );
+
+        assert( 800 < numToInsert );
+
+        assertEquals( numToInsert , c.find().count() );
+        assertEquals( numToInsert , c.find().toArray().size() );
+        assertEquals( numToInsert , c.find().limit(800).count() );
+        assertEquals( 800 , c.find().limit(800).toArray().size() );
+
+        // negative limit works like negative batchsize, for legacy reason
+        int x = c.find().limit(-800).toArray().size();
+        assertLess( x , 800 );
+
+        DBCursor a = c.find();
+        assertEquals( numToInsert , a.itcount() );
+
+        DBCursor b = c.find().batchSize( 10 );
+        assertEquals( numToInsert , b.itcount() );
+        assertEquals( 10 , b.getSizes().get(0).intValue() );
+
+        assertLess( a.numGetMores() , b.numGetMores() );
+
+        assertEquals( numToInsert , c.find().batchSize(2).itcount() );
+        assertEquals( numToInsert , c.find().batchSize(1).itcount() );
+
+        assertEquals( numToInsert , _count( c.find( null , null).skip(  0 ).batchSize( 5 ) ) );
+        assertEquals( 5 , _count( c.find( null , null).skip(  0 ).batchSize( -5 ) ) );
+    }
+    
     @SuppressWarnings("unchecked")
 	int _count( Iterator i ){
         int c = 0;

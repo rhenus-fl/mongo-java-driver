@@ -177,6 +177,100 @@ public class DBObjectTest extends TestCase {
         assertEquals(keysFromKeySet, expectedKeys);
         assertEquals(keysFromEntrySet, expectedKeys);
     }
+    
+    
+    
+    
+    
+    @Test(groups = {"basic"})
+    public void testTokenizedKeyDBObjectCTOR()  {
+        Map m = new HashMap();
+        m.put("key", "value");
+        m.put("foo", 1);
+        m.put("bar", null);
+
+        DBObject obj = new TokenizedKeyDBObject(m);
+        assertEquals(obj.get("key"), "value");
+        assertEquals(obj.get("foo"), 1);
+        assertEquals(obj.get("bar"), null);
+    }
+
+    @Test(groups = {"basic"})
+    public void testTokenizedKeyDBObjectToString()  {
+        Map m = new HashMap();
+        m.put("key", new DBPointer("foo", new ObjectId("123456789012123456789012")));
+
+        DBObject obj = new TokenizedKeyDBObject(m);
+        assertEquals(obj.get("key").toString(), "{ \"$ref\" : \"foo\", \"$id\" : ObjectId(\"123456789012123456789012\") }");
+    }
+
+
+    @Test(groups = {"basic"})
+    public void testTokenizedKeyDBObjectRemoveField() {
+        TokenizedKeyDBObject obj = new TokenizedKeyDBObject();
+        obj.put("x", "y");
+        obj.put("y", "z");
+
+        assertTrue(obj.containsKey("x"));
+        assertTrue(obj.containsKey("y"));
+        assertEquals(obj.toString(), "{ \"TOKENIZE\" : \"1\" , \"x\" : \"y\" , \"y\" : \"z\"}");
+
+        obj.removeField("x");
+
+        assertFalse(obj.containsKey("x"));
+        assertTrue(obj.containsKey("y"));
+        assertEquals(obj.toString(), "{ \"TOKENIZE\" : \"1\" , \"y\" : \"z\"}");
+
+        obj.put("x", "y");
+
+        assertTrue(obj.containsKey("x"));
+        assertTrue(obj.containsKey("y"));
+        assertEquals(obj.toString(), "{ \"TOKENIZE\" : \"1\" , \"y\" : \"z\" , \"x\" : \"y\"}");
+    }
+
+
+    @Test(groups = {"basic"})
+    public void testTokenizedKeyDBObjectInnerDot() {
+        DBCollection _colTest = _db.getCollection("test_collection");
+
+        TokenizedKeyDBObject dbObject = new TokenizedKeyDBObject("test", "value");
+        TokenizedKeyDBObject innerObject = new TokenizedKeyDBObject("test.member.name", true);
+        dbObject.put("inner", innerObject);
+
+        boolean thrown = false;
+        try {
+            _colTest.save(dbObject);
+        }
+        catch (IllegalArgumentException e) {
+            if (e.getMessage().startsWith("fields stored in the db can't have . in them")) {
+                thrown = true;
+            }
+        }
+        assertTrue(thrown);
+    }
+
+    @Test(groups = {"basic"})
+    public void testTokenizedKeyDBObjectEntrySetOrder() {
+        final List<String> expectedKeys = new ArrayList<String>();
+        final TokenizedKeyDBObject o = new TokenizedKeyDBObject();
+        expectedKeys.add("TOKENIZE");
+        for (int i = 1; i < 1000; i++) {
+            final String key = String.valueOf(i);
+            expectedKeys.add(key);
+            o.put(key, "Test" + key);
+        }
+        final List<String> keysFromKeySet = new ArrayList<String>(o.keySet());
+        final List<String> keysFromEntrySet = new ArrayList<String>();
+        for (final Map.Entry<String, Object> entry : o.entrySet()) {
+            keysFromEntrySet.add(entry.getKey());
+        }
+        assertEquals(keysFromKeySet, expectedKeys);
+        assertEquals(keysFromEntrySet, expectedKeys);
+    }
+    
+    
+    
+    
 
     private DB _db;
     

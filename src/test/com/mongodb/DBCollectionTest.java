@@ -49,6 +49,21 @@ public class DBCollectionTest extends TestCase {
     }
 
     @Test(groups = {"basic"})
+    public void testMultiTokenizedKeyDBObjectInsert() {
+        DBCollection c = _db.getCollection("testmultiinsert");
+        c.drop();
+
+        DBObject obj = c.findOne();
+        assertEquals(obj, null);
+
+        DBObject inserted1 = TokenizedKeyDBObjectBuilder.start().add("x",1).add("y",2).get();
+        DBObject inserted2 = TokenizedKeyDBObjectBuilder.start().add("x",3).add("y",3).get();
+        c.insert(inserted1,inserted2);
+        c.insert(new DBObject[] {inserted1,inserted2});
+    }
+
+    
+    @Test(groups = {"basic"})
     public void testDuplicateKeyException() {
         DBCollection c = _db.getCollection("testDuplicateKey");
         c.drop();
@@ -105,6 +120,87 @@ public class DBCollectionTest extends TestCase {
         obj = c.findOne(new BasicDBObject("x", 1), new BasicDBObject("y", 1));
         assertEquals(obj.containsField("x"), false);
         assertEquals(obj.get("y"), 2);
+    }
+    
+    
+    @Test(groups = {"basic"})
+    public void testFindOneTokenizedKeyDBObject() {
+        DBCollection c = _db.getCollection("test");
+        c.drop();
+
+        DBObject obj = c.findOne();
+        assertEquals(obj, null);
+
+        obj = c.findOne();
+        assertEquals(obj, null);
+
+        obj = c.findOne();
+        assertEquals(obj, null);
+
+        // Test that findOne works when fields is specified but no match is found
+        // *** This is a Regression test for JAVA-411 ***
+        obj = c.findOne(null, new TokenizedKeyDBObject("_id", true));
+
+        assertEquals(obj, null);
+
+        DBObject inserted = TokenizedKeyDBObjectBuilder.start().add("x",1).add("y",2).get();
+        c.insert(inserted);
+        c.insert(TokenizedKeyDBObjectBuilder.start().add("_id", 123).add("x",2).add("z",2).get());
+
+        obj = c.findOne(new TokenizedKeyDBObject("_id",123));
+        assertEquals(obj.get("_id"), 123);
+        assertEquals(obj.get("x"), 2);
+        assertEquals(obj.get("z"), 2);
+
+        obj = c.findOne(new TokenizedKeyDBObject("_id",123), new TokenizedKeyDBObject("x", 1));
+        assertEquals(obj.get("_id"), 123);
+        assertEquals(obj.get("x"), 2);
+        assertEquals(obj.containsField("z"), false);
+
+        obj = c.findOne(new TokenizedKeyDBObject("x", 1));
+        assertEquals(obj.get("x"), 1);
+        assertEquals(obj.get("y"), 2);
+
+        obj = c.findOne(new TokenizedKeyDBObject("x", 1), new TokenizedKeyDBObject("y", 1));
+        assertEquals(obj.containsField("x"), false);
+        assertEquals(obj.get("y"), 2);
+    }
+    
+    @Test
+    public void testFindOneSort(){
+    	
+    	DBCollection c = _db.getCollection("test");
+    	c.drop();
+    	
+        DBObject obj = c.findOne();
+        assertEquals(obj, null);
+
+        c.insert(BasicDBObjectBuilder.start().add("_id", 1).add("x", 100).add("y", "abc").get());
+        c.insert(BasicDBObjectBuilder.start().add("_id", 2).add("x", 200).add("y", "abc").get()); //max x
+        c.insert(BasicDBObjectBuilder.start().add("_id", 3).add("x", 1).add("y", "abc").get());
+        c.insert(BasicDBObjectBuilder.start().add("_id", 4).add("x", -100).add("y", "xyz").get()); //min x
+        c.insert(BasicDBObjectBuilder.start().add("_id", 5).add("x", -50).add("y", "zzz").get());  //max y
+        c.insert(BasicDBObjectBuilder.start().add("_id", 6).add("x", 9).add("y", "aaa").get());  //min y
+        c.insert(BasicDBObjectBuilder.start().add("_id", 7).add("x", 1).add("y", "bbb").get());
+      
+        //only sort
+        obj = c.findOne(new BasicDBObject(),  new BasicDBObject("x", 1) );
+        assertNotNull(obj);
+        assertEquals(4, obj.get("_id"));
+        
+        obj = c.findOne(new BasicDBObject(),  new BasicDBObject("x", -1));
+        assertNotNull(obj);
+        assertEquals(obj.get("_id"), 2);
+        
+        //query and sort
+        obj = c.findOne(new BasicDBObject("x", 1),  BasicDBObjectBuilder.start().add("x", 1).add("y", 1).get() );
+        assertNotNull(obj);
+        assertEquals(obj.get("_id"), 3);
+        
+        obj = c.findOne( QueryBuilder.start("x").lessThan(2).get(),  BasicDBObjectBuilder.start().add("y", -1).get() );
+        assertNotNull(obj);
+        assertEquals(obj.get("_id"), 5);
+        
     }
 
     /**
@@ -275,9 +371,13 @@ public class DBCollectionTest extends TestCase {
         DBObject inserted1 = BasicDBObjectBuilder.start("_id", id).add("x",1).add("y",2).get();
         DBObject inserted2 = BasicDBObjectBuilder.start("_id", id).add("x",3).add("y",4).get();
         DBObject inserted3 = BasicDBObjectBuilder.start().add("x",5).add("y",6).get();
-        WriteConcern wc = new WriteConcern();
-        WriteConcern newWC = wc.continueOnErrorForInsert(true);
-        WriteResult r = c.insert(newWC, inserted1, inserted2, inserted3);
+        WriteConcern newWC = WriteConcern.SAFE.continueOnErrorForInsert(true);
+        try {
+            c.insert(newWC, inserted1, inserted2, inserted3);
+            fail("Insert should have failed");
+        } catch (MongoException e) {
+            assertEquals(11000, e.getCode());
+        }
         assertEquals( c.count(), 2 );
     }
 

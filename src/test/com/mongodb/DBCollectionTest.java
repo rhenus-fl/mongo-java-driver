@@ -180,6 +180,11 @@ public class DBCollectionTest extends TestCase {
         DBObject inserted = TokenizedKeyDBObjectBuilder.start().add("x",1).add("y",2).get();
         c.insert(inserted);
         c.insert(TokenizedKeyDBObjectBuilder.start().add("_id", 123).add("x",2).add("z",2).get());
+        DBObject inserted2 = TokenizedKeyDBObjectBuilder.start().add("_id", 1234).add("x",2)
+                .add("z",new TokenizedKeyDBObject[] {new TokenizedKeyDBObject("a",1),new TokenizedKeyDBObject("a",2)}).get();
+        System.out.println(inserted2);
+        c.insert(inserted2);
+        System.out.println(inserted2);
 
         obj = c.find(new TokenizedKeyDBObject("x", 1));
         DBObject dbo = obj.next();
@@ -190,6 +195,14 @@ public class DBCollectionTest extends TestCase {
         dbo = obj.next();
         assertEquals(dbo.containsField("x"), false);
         assertEquals(dbo.get("y"), 2);
+        
+        obj = c.find(new TokenizedKeyDBObject("_id", 1234));
+        dbo = obj.next();
+        assertEquals(dbo.get("x"), 2);
+        
+        obj = c.find(new TokenizedKeyDBObject("z", new TokenizedKeyDBObject("$elemMatch",new TokenizedKeyDBObject("a",1))));
+        dbo = obj.next();
+        assertEquals(dbo.get("x"), 2);
     }
     
     

@@ -12,7 +12,7 @@ public class TokenizedDBCursor extends DBCursor {
     @Override
     public DBObject next() {
         DBObject next = super.next();
-        converter.transformAttrs(next, false);
+        converter.transformAttrs(next, false, false, false);
         return next;
     }
 

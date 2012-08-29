@@ -254,7 +254,7 @@ public class DBApiLayer extends DB {
                 for ( ; cur<arr.length; cur++ ){
                     DBObject o = arr[cur];
                     
-                    converter.transformAttrs(o, true);
+                    converter.transformAttrs(o, true, true, false);
                     
                     om.putObject( o );
 
@@ -312,8 +312,8 @@ public class DBApiLayer extends DB {
             if ( ref == null )
                 ref = new BasicDBObject();
 
-            converter.transformAttrs(ref, true);
-            converter.transformAttrs(fields, true);
+            converter.transformAttrs(ref, true, false, false);
+            converter.transformAttrs(fields, true, false, true);
             
             if ( willTrace() ) trace( "find: " + _fullNameSpace + " " + JSON.serialize( ref ) );
 
@@ -329,7 +329,7 @@ public class DBApiLayer extends DB {
                     throw e;
             }
 
-            return new Result( this , res , batchSize, limit , options, decoder );
+            return new Result( this , res , batchSize, limit , options, decoder);
         }
 
         @Override
@@ -340,7 +340,7 @@ public class DBApiLayer extends DB {
                 encoder = DefaultDBEncoder.FACTORY.create();
 
             if (!o.keySet().isEmpty()) {
-                converter.transformAttrs(o, true);
+                converter.transformAttrs(o, true, true, false);
                 
                 // if 1st key doesn't start with $, then object will be inserted as is, need to check it
                 String key = o.keySet().iterator().next();
@@ -350,7 +350,7 @@ public class DBApiLayer extends DB {
 
             if ( willTrace() ) trace( "update: " + _fullNameSpace + " " + JSON.serialize( query ) + " " + JSON.serialize( o )  );
 
-			converter.transformAttrs(query, true);
+			converter.transformAttrs(query, true, false, false);
 			
             OutMessage om = new OutMessage( _mongo , 2001, encoder );
             om.writeInt( 0 ); // reserved
@@ -437,7 +437,7 @@ public class DBApiLayer extends DB {
             if ( _cur.hasNext() ) {
                 DBObject ret = _cur.next();
                 
-                converter.transformAttrs(ret, false);
+                converter.transformAttrs(ret, false, false, false);
                 
                 return ret;
             }

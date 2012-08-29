@@ -292,7 +292,9 @@ public class DBApiLayer extends DB {
                 om.writeInt( 1 );
             else
                 om.writeInt( 0 );
-
+            
+            converter.transformAttrs(o, true, false, false); 
+            
             om.putObject( o );
 
             return _connector.say( _db , om , concern );
@@ -373,6 +375,8 @@ public class DBApiLayer extends DB {
             if (encoder == null)
                 encoder = DefaultDBEncoder.FACTORY.create();
 
+            converter.transformAttrs(keys, true, false, false);
+            
             DBObject full = new BasicDBObject();
             for ( String k : options.keySet() )
                 full.put( k , options.get( k ) );
@@ -400,6 +404,24 @@ public class DBApiLayer extends DB {
         public DBCursor find() {
             return new TokenizedDBCursor( this, null, null, getReadPreference(), converter);
         }
+
+        @Override
+        public long getCount(DBObject query, DBObject fields, long limit, long skip) throws MongoException {
+            converter.transformAttrs(query, true, false, false);
+            converter.transformAttrs(fields, true, false, true);
+            return super.getCount(query, fields, limit, skip);
+        }
+
+        @Override
+        public DBObject findAndModify(DBObject query, DBObject fields, DBObject sort, boolean remove, DBObject update,
+                boolean returnNew, boolean upsert) {
+            converter.transformAttrs(query, true, false, false);
+            converter.transformAttrs(fields, true, false, true);
+            converter.transformAttrs(sort, true, false, false);
+            converter.transformAttrs(update, true, true, false);
+            return super.findAndModify(query, fields, sort, remove, update, returnNew, upsert);
+        }
+        
         
         
     }

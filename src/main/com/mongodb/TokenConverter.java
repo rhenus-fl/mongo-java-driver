@@ -39,7 +39,7 @@ public class TokenConverter {
 
 
     public void transformAttrs(DBObject o, boolean toToken, boolean createMapping, boolean preserveTokenizeAttr) {
-        
+
         if (o == null)
             return;
 
@@ -60,10 +60,10 @@ public class TokenConverter {
             if (!preserveTokenizeAttr && toToken && !createMapping && entry.getKey().equals(TOKENIZE)) {
                 o.removeField(TOKENIZE);
                 continue;
-            } else if( entry.getKey().equals(TOKENIZE)) {
+            } else if (entry.getKey().equals(TOKENIZE)) {
                 continue;
             }
-            
+
             Object value = o.removeField(entry.getKey());
 
             if (toToken)
@@ -74,6 +74,8 @@ public class TokenConverter {
                     field = entry.getKey();
                 o.put(field, value);
             }
+            if (value == null)
+                continue;
 
             if (value instanceof List || o instanceof BasicBSONList) {
                 for (Object dbo : (List) value)

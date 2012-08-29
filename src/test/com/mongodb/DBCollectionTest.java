@@ -182,10 +182,8 @@ public class DBCollectionTest extends TestCase {
         c.insert(TokenizedKeyDBObjectBuilder.start().add("_id", 123).add("x",2).add("z",2).get());
         DBObject inserted2 = TokenizedKeyDBObjectBuilder.start().add("_id", 1234).add("x",2)
                 .add("z",new TokenizedKeyDBObject[] {new TokenizedKeyDBObject("a",1),new TokenizedKeyDBObject("a",2)}).get();
-        System.out.println(inserted2);
         c.insert(inserted2);
-        System.out.println(inserted2);
-
+        
         obj = c.find(new TokenizedKeyDBObject("x", 1));
         DBObject dbo = obj.next();
         assertEquals(dbo.get("x"), 1);

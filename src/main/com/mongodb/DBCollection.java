@@ -639,7 +639,7 @@ public abstract class DBCollection {
     public DBCursor find(){
         return new DBCursor( this, null, null, getReadPreference());
     }
-
+       
     /**
      * Returns a single object from this collection.
      * @return the object found, or <code>null</code> if the collection is empty

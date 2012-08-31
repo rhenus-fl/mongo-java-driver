@@ -121,7 +121,7 @@ limitations under the License.
             fork="true"
             debug="on"
             includeantruntime="false">
-            <compilerarg value="-Xlint:all,-fallthrough"/>
+            <compilerarg value="-Xlint:all,-rawtypes"/>
             <classpath refid="classpath"/>
         </javac>
 
@@ -136,7 +136,7 @@ limitations under the License.
             debug="on"
             includeantruntime="false">
             <classpath refid="classpath"/>
-            <compilerarg value="-Xlint:all,-fallthrough"/>
+            <compilerarg value="-Xlint:all,-rawtypes"/>
         </javac>
 
     </target>
@@ -199,10 +199,10 @@ limitations under the License.
     <target name="javadocs" depends="compile,utilcompile" description="Generate API docs">
         <delete dir="docs/"/>
         <javadoc
-            packagenames="com.mongodb,com.mongodb.gridfs,com.mongodb.util,org.bson,org.bson.types,org.bson.io,org.bson.util"
+            packagenames="com.mongodb,com.mongodb.gridfs,com.mongodb.util,com.mongodb.tools,org.bson,org.bson.types,org.bson.io,org.bson.util"
             sourcepath="src/main/"
             defaultexcludes="yes"
-            destdir="docs/mongo-java-driver/${build.conf.lib.version}"
+            destdir="docs/mongo-java-driver"
             author="true"
             version="true"
             source="${build.conf.javac.source}"
@@ -210,14 +210,15 @@ limitations under the License.
             access="protected">
             <link href="http://download.oracle.com/javase/1.5.0/docs/api/"/>
             <classpath refid="classpath"/>
-            <taglet name="ApiToolsTaglet" path="build/util"/>
+            <taglet name="DochubTaglet" path="build/util"/>
+            <taglet name="ManualTaglet" path="build/util"/>
         </javadoc>
 
         <javadoc
             packagenames="org.bson,org.bson.types,org.bson.io,org.bson.util"
             sourcepath="src/main/"
             defaultexcludes="yes"
-            destdir="docs/bson/${build.conf.lib.version}"
+            destdir="docs/bson"
             author="true"
             version="true"
             source="${build.conf.javac.source}"
@@ -225,7 +226,8 @@ limitations under the License.
             access="protected">
             <link href="http://download.oracle.com/javase/1.5.0/docs/api/"/>
             <classpath refid="classpath"/>
-            <taglet name="ApiToolsTaglet" path="build/util"/>
+            <taglet name="DochubTaglet" path="build/util"/>
+            <taglet name="ManualTaglet" path="build/util"/>
         </javadoc>
 
     </target>
@@ -237,7 +239,7 @@ limitations under the License.
     <target name="alljars" depends="jar, javadocs" description="build jar, source jar, javadoc jar">
 
         <jar jarfile="mongo-sources.jar"><fileset dir="src/main"><not><filename name="META-INF/"/></not></fileset></jar>
-        <jar jarfile="mongo-javadoc.jar"><fileset dir="docs/mongo-java-driver/${build.conf.lib.version}"/></jar>
+        <jar jarfile="mongo-javadoc.jar"><fileset dir="docs/mongo-java-driver"/></jar>
 
         <jar jarfile="bson-sources.jar">
             <fileset dir="src/main">
@@ -246,7 +248,7 @@ limitations under the License.
             </fileset>
         </jar>
 
-        <jar jarfile="bson-javadoc.jar"><fileset dir="docs/bson/${build.conf.lib.version}"/></jar>
+        <jar jarfile="bson-javadoc.jar"><fileset dir="docs/bson"/></jar>
 
     </target>
 
@@ -265,6 +267,7 @@ limitations under the License.
     <target name="test" depends="compile">
         <testng classpathref="classpath" outputdir="${testdir}" listeners="com.mongodb.util.TestNGListener" haltonfailure="true" >
             <jvmarg value="-Xmx512M" />
+            <jvmarg value="-ea" />
             <jvmarg value="-Dcom.mongodb.slaveAcceptableLatencyMS=${test.com.mongodb.slaveAcceptableLatencyMS}"/>
 
             <xmlfileset dir="." includes="testng.xml"/>
@@ -287,6 +290,7 @@ limitations under the License.
 
         <testng classpathref="classpath" outputdir="${testdir}" haltonfailure="true" verbose="1" listeners="com.mongodb.util.TestNGListener" >
             <jvmarg value="-Xmx512M" />
+            <jvmarg value="-ea" />
             <jvmarg value="-Dcom.mongodb.slaveAcceptableLatencyMS=${test.com.mongodb.slaveAcceptableLatencyMS}"/>
             <xmlfileset dir="build/test" includes="testng-single.xml"/>
         </testng>
@@ -367,6 +371,7 @@ limitations under the License.
 
         <testng classpathref="classpath.clover" outputdir="${testdir}" listeners="com.mongodb.util.TestNGListener" haltonfailure="false" verbose="1">
             <jvmarg value="-Xmx512M" />
+            <jvmarg value="-ea" />
             <jvmarg value="-Dcom.mongodb.slaveAcceptableLatencyMS=${test.com.mongodb.slaveAcceptableLatencyMS}"/>
             <xmlfileset dir="." includes="testng.xml"/>
         </testng>

@@ -16,14 +16,17 @@
 
 package com.mongodb;
 
-import java.net.*;
-import java.util.*;
+import com.mongodb.util.TestCase;
+import org.bson.BSONDecoder;
+import org.bson.BasicBSONDecoder;
+import org.bson.io.BasicOutputBuffer;
+import org.bson.io.OutputBuffer;
+import org.bson.types.ObjectId;
+import org.testng.annotations.Test;
 
-import org.bson.*;
-import org.bson.types.*;
-import org.testng.annotations.*;
-
-import com.mongodb.util.*;
+import java.net.UnknownHostException;
+import java.util.ArrayList;
+import java.util.List;
 
 public class DBRefTest extends TestCase {
 
@@ -39,6 +42,16 @@ public class DBRefTest extends TestCase {
     }
 
     @Test(groups = {"basic"})
+    public void testEqualsAndHashCode() {
+       DBRef ref = new DBRef(_db, "foo.bar", 4);
+       DBRef other = new DBRef(_db, "foo.bar", 4);
+       assertEquals(ref, ref);
+       assertEquals(ref, other);
+       assertNotEquals(ref, new DBRefBase(_db, "foo.bar", 4));
+       assertEquals(ref.hashCode(), other.hashCode());
+    }
+
+    @Test(groups = {"basic"})
     public void testDBRefBaseToString(){
 
         ObjectId id = new ObjectId("123456789012345678901234");
@@ -50,22 +63,20 @@ public class DBRefTest extends TestCase {
     @Test(groups = {"basic"})
     public void testDBRef(){
 
-        DBRef ref = new DBRef(_db, "hello", (Object)"world");
+        DBRef ref = new DBRef(_db, "hello", "world");
         DBObject o = new BasicDBObject("!", ref);
 
-        OutMessage out = new OutMessage( cleanupMongo );
-        out.putObject( o );
+        DBEncoder encoder = DefaultDBEncoder.FACTORY.create();
+        OutputBuffer buf = new BasicOutputBuffer();
+
+        encoder.writeObject(buf, o);
 
         DefaultDBCallback cb = new DefaultDBCallback( null );
         BSONDecoder decoder = new BasicBSONDecoder();
-        decoder.decode( out.toByteArray() , cb );
+        decoder.decode( buf.toByteArray() , cb );
         DBObject read = cb.dbget();
 
-	    String correct = null;
-	    correct = "{\"!\":{\"$ref\":\"hello\",\"$id\":\"world\"}}";
-
-        String got = read.toString().replaceAll( " +" , "" );
-        assertEquals( correct , got );
+        assertEquals("{\"!\":{\"$ref\":\"hello\",\"$id\":\"world\"}}", read.toString().replaceAll( " +" , "" ));
     }
 
     @Test(groups = {"basic"})

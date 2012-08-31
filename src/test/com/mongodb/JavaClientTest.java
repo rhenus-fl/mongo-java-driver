@@ -472,7 +472,8 @@ public class JavaClientTest extends TestCase {
 
         MapReduceOutput out =
             c.mapReduce( "function(){ for ( var i=0; i<this.x.length; i++ ){ emit( this.x[i] , 1 ); } }" ,
-                         "function(key,values){ var sum=0; for( var i=0; i<values.length; i++ ) sum += values[i]; return sum;}" , null, MapReduceCommand.OutputType.INLINE, null);
+                         "function(key,values){ var sum=0; for( var i=0; i<values.length; i++ ) sum += values[i]; return sum;}" , 
+                         null, MapReduceCommand.OutputType.INLINE, null, ReadPreference.primaryPreferred());
 
         Map<String,Integer> m = new HashMap<String,Integer>();
         for ( DBObject r : out.results() ){
@@ -559,6 +560,58 @@ public class JavaClientTest extends TestCase {
         assertEquals( 2 , m.get( "c" ).intValue() );
         assertEquals( 1 , m.get( "d" ).intValue() );
 
+    }
+    
+    @Test
+    public void testAggregation(){
+        if (!serverIsAtLeastVersion(2.1)) {
+            return;
+        }
+
+        DBCollection c = _db.getCollection( "aggregationTest" );
+        c.drop();
+        
+        DBObject foo = new BasicDBObject( "name" , "foo" ) ;
+        DBObject bar = new BasicDBObject( "name" , "bar" ) ;
+        DBObject baz = new BasicDBObject( "name" , "foo" ) ;
+        foo.put( "count", 5 );
+        bar.put( "count", 2 );
+        baz.put( "count", 7 );
+        c.insert( foo );
+        c.insert( bar );
+        c.insert( baz );
+        
+        DBObject projFields = new BasicDBObject( "name", 1 );
+        projFields.put("count", 1);
+        
+        List<DBObject> groupOperations = new ArrayList<DBObject>();
+        groupOperations.add(new BasicDBObject( ));
+        groupOperations.add(new BasicDBObject( "countPerName", new BasicDBObject( "$sum", 1 )));
+        DBObject group = new BasicDBObject( );
+        group.put("_id", "$name" );
+        group.put( "docsPerName", new BasicDBObject( "$sum", 1 ));
+        group.put( "countPerName", new BasicDBObject( "$sum", "$count" ));
+        
+        AggregationOutput out = c.aggregate( new BasicDBObject( "$project", projFields ), new BasicDBObject( "$group", group) );
+        
+        Map<String, DBObject> results = new HashMap<String, DBObject>();
+        for(DBObject result : out.results())
+            results.put((String)result.get("_id"), result);
+        
+        DBObject fooResult = results.get("foo");
+        assertNotNull(fooResult);
+        assertEquals(2, fooResult.get("docsPerName"));
+        assertEquals(12, fooResult.get("countPerName"));
+        
+        DBObject barResult = results.get("bar");
+        assertNotNull(barResult);
+        assertEquals(1, barResult.get("docsPerName"));
+        assertEquals(2, barResult.get("countPerName"));
+        
+       DBObject aggregationCommand = out.getCommand();
+       assertNotNull(aggregationCommand);
+       assertEquals(c.getName(), aggregationCommand.get("aggregate"));
+       assertNotNull(aggregationCommand.get("pipeline"));
     }
 
     String _testMulti( DBCollection c ){
@@ -848,15 +901,20 @@ public class JavaClientTest extends TestCase {
         // test exception throwing
         c.insert( new BasicDBObject( "a" , 1 ) );
         try {
-            dbObj = c.findAndModify( null, null );
-            assertTrue(false, "Exception not thrown when no update nor remove");
+            c.findAndModify( null, null );
+            fail("Exception not thrown when no update nor remove");
         } catch (MongoException e) {
         }
 
         try {
             dbObj = c.findAndModify( new BasicDBObject("a", "noexist"), null );
+            if (!serverIsAtLeastVersion(2.1)) {
+               assertNull(dbObj);
+            }
         } catch (MongoException e) {
-            assertTrue(false, "Exception thrown when matching record");
+            if (!serverIsAtLeastVersion(2.1)) {
+                fail("Exception thrown when matching record");
+            }
         }
     }
 

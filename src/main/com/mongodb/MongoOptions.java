@@ -34,12 +34,13 @@ public class MongoOptions {
         connectionsPerHost = Bytes.CONNECTIONS_PER_HOST;
         threadsAllowedToBlockForConnectionMultiplier = 5;
         maxWaitTime = 1000 * 60 * 2;
-        connectTimeout = 0;
+        connectTimeout = 1000 * 10;
         socketTimeout = 0;
         socketKeepAlive = false;
         autoConnectRetry = false;
         maxAutoConnectRetryTime = 0;
         slaveOk = false;
+        readPreference = null;
         safe = false;
         w = 0;
         wtimeout = 0;
@@ -49,6 +50,7 @@ public class MongoOptions {
         dbEncoderFactory = DefaultDBEncoder.FACTORY;
         socketFactory = SocketFactory.getDefault();
         description = null;
+        cursorFinalizerEnabled = true;
     }
 
     public MongoOptions copy() {
@@ -62,6 +64,7 @@ public class MongoOptions {
         m.autoConnectRetry = autoConnectRetry;
         m.maxAutoConnectRetryTime = maxAutoConnectRetryTime;
         m.slaveOk = slaveOk;
+        m.readPreference = readPreference;
         m.safe = safe;
         m.w = w;
         m.wtimeout = wtimeout;
@@ -71,6 +74,7 @@ public class MongoOptions {
         m.dbEncoderFactory = dbEncoderFactory;
         m.socketFactory = socketFactory;
         m.description = description;
+        m.cursorFinalizerEnabled = cursorFinalizerEnabled;
         return m;
     }
 
@@ -118,9 +122,9 @@ public class MongoOptions {
     public int maxWaitTime;
 
     /**
-     * The connection timeout in milliseconds.
+     * The connection timeout in milliseconds.  A value of 0 means no timeout.
      * It is used solely when establishing a new connection {@link java.net.Socket#connect(java.net.SocketAddress, int) }
-     * Default is 0 and means no timeout.
+     * Default is 10,000.
      */
     public int connectTimeout;
 
@@ -164,11 +168,16 @@ public class MongoOptions {
      * Note that reading from secondaries can increase performance and reliability, but it may result in temporary inconsistent results.
      * Default is false.
      *
-     * @deprecated Replaced in MongoDB 2.0/Java Driver 2.7 with ReadPreference.SECONDARY
-     * @see com.mongodb.ReadPreference.SECONDARY
+     * @deprecated Replaced with {@code ReadPreference.secondaryPreferred()}
+     * @see ReadPreference#secondaryPreferred()
      */
     @Deprecated
     public boolean slaveOk;
+
+    /**
+     * Specifies the read preference.
+     */
+    public ReadPreference readPreference;
 
     /**
      * Override the DBCallback factory. Default is for the standard Mongo Java driver configuration.
@@ -219,6 +228,16 @@ public class MongoOptions {
      */
     public SocketFactory socketFactory;
 
+    /**
+     * Sets whether there is a a finalize method created that cleans up instances of DBCursor that the client
+     * does not close.  If you are careful to always call the close method of DBCursor, then this can safely be set to false.
+     * @see com.mongodb.DBCursor#close().
+     * Default is true.
+     */
+    public boolean cursorFinalizerEnabled;
+
+
+
     public String toString(){
         StringBuilder buf = new StringBuilder();
         buf.append( "description=" ).append( description ).append( ", " );
@@ -231,11 +250,15 @@ public class MongoOptions {
         buf.append( "autoConnectRetry=" ).append( autoConnectRetry ).append( ", " );
         buf.append( "maxAutoConnectRetryTime=" ).append( maxAutoConnectRetryTime ).append( ", " );
         buf.append( "slaveOk=" ).append( slaveOk ).append( ", " );
+        if (readPreference != null) {
+            buf.append( "readPreference").append( readPreference );
+        }
         buf.append( "safe=" ).append( safe ).append( ", " );
         buf.append( "w=" ).append( w ).append( ", " );
         buf.append( "wtimeout=" ).append( wtimeout ).append( ", " );
         buf.append( "fsync=" ).append( fsync ).append( ", " );
-        buf.append( "j=" ).append( j );
+        buf.append( "j=" ).append(j).append( ", " );
+        buf.append( "cursorFinalizerEnabled=").append( cursorFinalizerEnabled);
 
         return buf.toString();
     }
@@ -282,7 +305,7 @@ public class MongoOptions {
 
     /**
      * 
-     * @param this multiplied with connectionsPerHost, sets the maximum number of threads that
+     * @param threads multiplied with connectionsPerHost, sets the maximum number of threads that
      * may be waiting for a connection
      */
     public synchronized void setThreadsAllowedToBlockForConnectionMultiplier(int threads) {
@@ -511,5 +534,38 @@ public class MongoOptions {
      */
     public synchronized void setSocketFactory(SocketFactory factory) {
         socketFactory = factory;
+    }
+
+    /**
+     *
+     * @return the read preference
+     */
+    public ReadPreference getReadPreference() {
+        return readPreference;
+    }
+
+    /**
+     *
+     * @param readPreference the read preference
+     */
+    public void setReadPreference(ReadPreference readPreference) {
+        this.readPreference = readPreference;
+    }
+
+
+    /**
+     *
+     * @return whether DBCursor finalizer is enabled
+     */
+    public boolean isCursorFinalizerEnabled() {
+        return cursorFinalizerEnabled;
+    }
+
+    /**
+     *
+     * @param cursorFinalizerEnabled whether cursor finalizer is enabled
+     */
+    public void setCursorFinalizerEnabled(final boolean cursorFinalizerEnabled) {
+        this.cursorFinalizerEnabled = cursorFinalizerEnabled;
     }
 }

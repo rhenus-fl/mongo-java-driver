@@ -18,20 +18,18 @@
 
 package com.mongodb.gridfs;
 
+import com.mongodb.BasicDBObjectBuilder;
+import com.mongodb.DBObject;
+import com.mongodb.MongoException;
+import com.mongodb.util.Util;
+import org.bson.types.ObjectId;
+
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
 import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
 import java.util.Date;
-
-import org.bson.types.ObjectId;
-
-import com.mongodb.BasicDBObjectBuilder;
-import com.mongodb.DBObject;
-import com.mongodb.WriteConcern;
-import com.mongodb.MongoException;
-import com.mongodb.util.SimplePool;
-import com.mongodb.util.Util;
 
 /**
  * This class represents a GridFS file to be written to the database
@@ -65,7 +63,11 @@ public class GridFSInputFile extends GridFSFile {
         _id = new ObjectId();
         _chunkSize = GridFS.DEFAULT_CHUNKSIZE;
         _uploadDate = new Date();
-        _messageDigester = _md5Pool.get();
+        try {
+            _messageDigester = MessageDigest.getInstance("MD5");
+        } catch (NoSuchAlgorithmException e) {
+            throw new RuntimeException("No MD5!");
+        }
         _messageDigester.reset();
         _buffer = new byte[(int) _chunkSize];
     }
@@ -149,6 +151,7 @@ public class GridFSInputFile extends GridFSFile {
 
     /**
      * calls {@link GridFSInputFile#save(long)} with the existing chunk size
+     * @throws MongoException 
      */
     @Override
     public void save() {
@@ -161,6 +164,7 @@ public class GridFSInputFile extends GridFSFile {
      *
      * @param chunkSize
      *            Size of chunks for file in bytes.
+     * @throws MongoException 
      */
     public void save( long chunkSize ) {
         if (_outputStream != null)
@@ -186,6 +190,7 @@ public class GridFSInputFile extends GridFSFile {
      * @throws IOException
      *             on problems reading the new entry's
      *             {@link java.io.InputStream}.
+     * @throws MongoException 
      */
     public int saveChunks() throws IOException {
         return saveChunks( _chunkSize );
@@ -202,6 +207,7 @@ public class GridFSInputFile extends GridFSFile {
      * @throws IOException
      *             on problems reading the new entry's
      *             {@link java.io.InputStream}.
+     * @throws MongoException 
      */
     public int saveChunks( long chunkSize ) throws IOException {
         if (_outputStream != null)
@@ -250,10 +256,9 @@ public class GridFSInputFile extends GridFSFile {
      * Dumps a new chunk into the chunks collection. Depending on the flag, also
      * partial buffers (at the end) are going to be written immediately.
      *
-     * @param data
-     *            Data for chunk.
      * @param writePartial
      *            Write also partial buffers full.
+     * @throws MongoException 
      */
     private void _dumpBuffer( boolean writePartial ) {
         if ( ( _currentBufferPosition < _chunkSize ) && !writePartial ) {
@@ -315,7 +320,6 @@ public class GridFSInputFile extends GridFSFile {
     private void _finishData() {
         if (!_savedChunks) {
             _md5 = Util.toHex( _messageDigester.digest() );
-            _md5Pool.done( _messageDigester );
             _messageDigester = null;
             _length = _totalBytes;
             _savedChunks = true;
@@ -337,25 +341,6 @@ public class GridFSInputFile extends GridFSFile {
     private long _totalBytes = 0;
     private MessageDigest _messageDigester = null;
     private OutputStream _outputStream = null;
-
-    /**
-     * A pool of {@link java.security.MessageDigest} objects.
-     */
-    static SimplePool<MessageDigest> _md5Pool
-            = new SimplePool<MessageDigest>( "md5" , 10 , -1 , false , false ) {
-        /**
-         * {@inheritDoc}
-         *
-         * @see com.mongodb.util.SimplePool#createNew()
-         */
-        protected MessageDigest createNew() {
-            try {
-                return MessageDigest.getInstance( "MD5" );
-            } catch ( java.security.NoSuchAlgorithmException e ) {
-                throw new RuntimeException( "your system doesn't have md5!" );
-            }
-        }
-    };
 
     /**
      * An output stream implementation that can be used to successively write to

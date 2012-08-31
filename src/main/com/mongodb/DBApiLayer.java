@@ -18,8 +18,11 @@
 
 package com.mongodb;
 
+import com.mongodb.util.JSON;
+import org.bson.BSONObject;
+import org.bson.types.ObjectId;
+
 import java.util.ArrayList;
-import java.util.Collection;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.Iterator;
@@ -31,10 +34,6 @@ import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
-import org.bson.BSONObject;
-import org.bson.types.ObjectId;
-
-import com.mongodb.util.JSON;
 
 
 /** Database API
@@ -54,18 +53,18 @@ public class DBApiLayer extends DB {
     static final Logger TRACE_LOGGER = Logger.getLogger( "com.mongodb.TRACE" );
     static final Level TRACE_LEVEL = Boolean.getBoolean( "DB.TRACE" ) ? Level.INFO : Level.FINEST;
 
-    static final boolean willTrace(){
+    static boolean willTrace(){
         return TRACE_LOGGER.isLoggable( TRACE_LEVEL );
     }
 
-    static final void trace( String s ){
+    static void trace( String s ){
         TRACE_LOGGER.log( TRACE_LEVEL , s );
     }
 
     static int chooseBatchSize(int batchSize, int limit, int fetched) {
         int bs = Math.abs(batchSize);
         int remaining = limit > 0 ? limit - fetched : 0;
-        int res = 0;
+        int res;
         if (bs == 0 && remaining > 0)
             res = remaining;
         else if (bs > 0 && remaining == 0)
@@ -126,14 +125,12 @@ public class DBApiLayer extends DB {
         return old != null ? old : c;
     }
 
-    String _removeRoot( String ns ){
-        if ( ! ns.startsWith( _rootPlusDot ) )
-            return ns;
-        return ns.substring( _root.length() + 1 );
-    }
 
-    public void cleanCursors( boolean force )
-        throws MongoException {
+    /**
+     * @param force true if should clean regardless of number of dead cursors
+     * @throws MongoException
+     */
+    public void cleanCursors( boolean force ){
 
         int sz = _deadCursorIds.size();
 
@@ -165,15 +162,11 @@ public class DBApiLayer extends DB {
         }
     }
 
-    void killCursors( ServerAddress addr , List<Long> all )
-        throws MongoException {
+    void killCursors( ServerAddress addr , List<Long> all ){
         if ( all == null || all.size() == 0 )
             return;
 
-        OutMessage om = new OutMessage( _mongo , 2007 );
-        om.writeInt( 0 ); // reserved
-
-        om.writeInt( Math.min( NUM_CURSORS_PER_BATCH , all.size() ) );
+        OutMessage om = OutMessage.killCursors(_mongo, Math.min( NUM_CURSORS_PER_BATCH , all.size()));
 
         int soFar = 0;
         int totalSoFar = 0;
@@ -185,9 +178,7 @@ public class DBApiLayer extends DB {
 
             if ( soFar >= NUM_CURSORS_PER_BATCH ){
                 _connector.say( this , om ,com.mongodb.WriteConcern.NONE );
-                om = new OutMessage( _mongo , 2007 );
-                om.writeInt( 0 ); // reserved
-                om.writeInt( Math.min( NUM_CURSORS_PER_BATCH , all.size() - totalSoFar ) );
+                om = OutMessage.killCursors(_mongo, Math.min( NUM_CURSORS_PER_BATCH , all.size() - totalSoFar));
                 soFar = 0;
             }
         }
@@ -205,18 +196,21 @@ public class DBApiLayer extends DB {
         }
 
         @Override
-        public void drop() throws MongoException {
+        public void drop(){
             _collections.remove(getName());
             super.drop();
         }
 
-        public WriteResult insert(DBObject[] arr, com.mongodb.WriteConcern concern, DBEncoder encoder )
-            throws MongoException {
+        public WriteResult insert(DBObject[] arr, com.mongodb.WriteConcern concern, DBEncoder encoder ){
+
+            if (concern == null) {
+                throw new IllegalArgumentException("Write concern can not be null");
+            }
+
             return insert( arr, true, concern, encoder );
         }
 
-        protected WriteResult insert(DBObject[] arr, boolean shouldApply , com.mongodb.WriteConcern concern, DBEncoder encoder )
-            throws MongoException {
+        protected WriteResult insert(DBObject[] arr, boolean shouldApply , com.mongodb.WriteConcern concern, DBEncoder encoder ){
 
             if (encoder == null)
                 encoder = DefaultDBEncoder.FACTORY.create();
@@ -228,13 +222,12 @@ public class DBApiLayer extends DB {
             }
 
             if ( shouldApply ){
-                for ( int i=0; i<arr.length; i++ ){
-                    DBObject o=arr[i];
-                    apply( o );
-                    _checkObject( o , false , false );
-                    Object id = o.get( "_id" );
-                    if ( id instanceof ObjectId ){
-                        ((ObjectId)id).notNew();
+                for (DBObject o : arr) {
+                    apply(o);
+                    _checkObject(o, false, false);
+                    Object id = o.get("_id");
+                    if (id instanceof ObjectId) {
+                        ((ObjectId) id).notNew();
                     }
                 }
             }
@@ -243,15 +236,11 @@ public class DBApiLayer extends DB {
 
             int cur = 0;
             int maxsize = _mongo.getMaxBsonObjectSize();
-            while ( cur < arr.length ){
-                OutMessage om = new OutMessage( _mongo , 2002, encoder );
+            while ( cur < arr.length ) {
 
-                int flags = 0;
-                if ( concern.getContinueOnErrorForInsert() ) flags |= 1;
-                om.writeInt( flags );
-                om.writeCString( _fullNameSpace );
+               OutMessage om = OutMessage.insert( this , encoder, concern );
 
-                for ( ; cur<arr.length; cur++ ){
+               for ( ; cur<arr.length; cur++ ){
                     DBObject o = arr[cur];
                     
                     converter.transformAttrs(o, true, true, false);
@@ -271,45 +260,31 @@ public class DBApiLayer extends DB {
             return last;
         }
 
-        public WriteResult remove( DBObject o , com.mongodb.WriteConcern concern, DBEncoder encoder )
-            throws MongoException {
+        public WriteResult remove( DBObject o , com.mongodb.WriteConcern concern, DBEncoder encoder ){
+
+            if (concern == null) {
+                throw new IllegalArgumentException("Write concern can not be null");
+            }
 
             if (encoder == null)
                 encoder = DefaultDBEncoder.FACTORY.create();
 
             if ( willTrace() ) trace( "remove: " + _fullNameSpace + " " + JSON.serialize( o ) );
 
-            OutMessage om = new OutMessage( _mongo , 2006, encoder );
-
-            om.writeInt( 0 ); // reserved
-            om.writeCString( _fullNameSpace );
-
-            Collection<String> keys = o.keySet();
-
-            if ( keys.size() == 1 &&
-                 keys.iterator().next().equals( "_id" ) &&
-                 o.get( keys.iterator().next() ) instanceof ObjectId )
-                om.writeInt( 1 );
-            else
-                om.writeInt( 0 );
-            
-            converter.transformAttrs(o, true, false, false); 
-            
-            om.putObject( o );
+            OutMessage om = OutMessage.remove(this, encoder, o);
 
             return _connector.say( _db , om , concern );
         }
 
         @Override
-        Iterator<DBObject> __find( DBObject ref , DBObject fields , int numToSkip , int batchSize, int limit , int options, ReadPreference readPref, DBDecoder decoder )
-            throws MongoException {
+        Iterator<DBObject> __find( DBObject ref , DBObject fields , int numToSkip , int batchSize, int limit , int options, ReadPreference readPref, DBDecoder decoder ){
 
             return __find(ref, fields, numToSkip, batchSize, limit, options, readPref, decoder, DefaultDBEncoder.FACTORY.create());
         }
 
         @Override
         Iterator<DBObject> __find( DBObject ref , DBObject fields , int numToSkip , int batchSize , int limit, int options,
-                                            ReadPreference readPref, DBDecoder decoder, DBEncoder encoder ) throws MongoException {
+                                            ReadPreference readPref, DBDecoder decoder, DBEncoder encoder ){
 
             if ( ref == null )
                 ref = new BasicDBObject();
@@ -319,7 +294,7 @@ public class DBApiLayer extends DB {
             
             if ( willTrace() ) trace( "find: " + _fullNameSpace + " " + JSON.serialize( ref ) );
 
-            OutMessage query = OutMessage.query( _mongo , options , _fullNameSpace , numToSkip , chooseBatchSize(batchSize, limit, 0) , ref , fields, readPref,
+            OutMessage query = OutMessage.query( this , options , numToSkip , chooseBatchSize(batchSize, limit, 0) , ref , fields, readPref,
                     encoder);
 
             Response res = _connector.call( _db , this , query , null , 2, readPref, decoder );
@@ -335,8 +310,15 @@ public class DBApiLayer extends DB {
         }
 
         @Override
-        public WriteResult update( DBObject query , DBObject o , boolean upsert , boolean multi , com.mongodb.WriteConcern concern, DBEncoder encoder )
-            throws MongoException {
+        public WriteResult update( DBObject query , DBObject o , boolean upsert , boolean multi , com.mongodb.WriteConcern concern, DBEncoder encoder ){
+
+            if (o == null) {
+                throw new IllegalArgumentException("update can not be null");
+            }
+
+            if (concern == null) {
+                throw new IllegalArgumentException("Write concern can not be null");
+            }
 
             if (encoder == null)
                 encoder = DefaultDBEncoder.FACTORY.create();
@@ -350,27 +332,16 @@ public class DBApiLayer extends DB {
                     _checkObject(o, false, false);
             }
 
-            if ( willTrace() ) trace( "update: " + _fullNameSpace + " " + JSON.serialize( query ) + " " + JSON.serialize( o )  );
+            if ( willTrace() ) {
+                trace( "update: " + _fullNameSpace + " " + JSON.serialize( query ) + " " + JSON.serialize( o )  );
+            }
 
-			converter.transformAttrs(query, true, false, false);
-			
-            OutMessage om = new OutMessage( _mongo , 2001, encoder );
-            om.writeInt( 0 ); // reserved
-            om.writeCString( _fullNameSpace );
-
-            int flags = 0;
-            if ( upsert ) flags |= 1;
-            if ( multi ) flags |= 2;
-            om.writeInt( flags );
-
-            om.putObject( query );
-            om.putObject( o );
+            OutMessage om = OutMessage.update(this, encoder, upsert, multi, query, o);
 
             return _connector.say( _db , om , concern );
         }
 
-        public void createIndex( final DBObject keys, final DBObject options, DBEncoder encoder )
-            throws MongoException {
+        public void createIndex( final DBObject keys, final DBObject options, DBEncoder encoder ){
 
             if (encoder == null)
                 encoder = DefaultDBEncoder.FACTORY.create();
@@ -436,6 +407,9 @@ public class DBApiLayer extends DB {
             _host = res._host;
             _decoder = decoder;
             init( res );
+            // Only enable finalizer if cursor finalization is enabled and there is actually a cursor that needs killing
+            _optionalFinalizer = _mongo.getMongoOptions().isCursorFinalizerEnabled() && res.cursor() != 0 ?
+                    new OptionalFinalizer() : null;
         }
 
         private void init( Response res ){
@@ -490,7 +464,8 @@ public class DBApiLayer extends DB {
                         if ((_curResult._flags & Bytes.RESULTFLAG_AWAITCAPABLE) == 0) {
                             try {
                                 Thread.sleep(500);
-                            } catch (Exception e) {
+                            } catch (InterruptedException e) {
+                                // ignore
                             }
                         }
                     }
@@ -504,12 +479,8 @@ public class DBApiLayer extends DB {
             if ( _curResult.cursor() <= 0 )
                 throw new RuntimeException( "can't advance a cursor <= 0" );
 
-            OutMessage m = new OutMessage( _mongo , 2005 );
-
-            m.writeInt( 0 );
-            m.writeCString( _collection._fullNameSpace );
-            m.writeInt( chooseBatchSize(_batchSize, _limit, _numFetched) );
-            m.writeLong( _curResult.cursor() );
+            OutMessage m = OutMessage.getMore(_collection, _curResult.cursor(),
+                    chooseBatchSize(_batchSize, _limit, _numFetched));
 
             Response res = _connector.call( DBApiLayer.this , _collection , m , _host, _decoder );
             _numGetMores++;
@@ -530,18 +501,6 @@ public class DBApiLayer extends DB {
 
         public String toString(){
             return "DBCursor";
-        }
-
-        protected void finalize() throws Throwable {
-            if (_curResult != null) {
-                long curId = _curResult.cursor();
-                _curResult = null;
-                _cur = null;
-                if (curId != 0) {
-                    _deadCursorIds.add(new DeadCursor(curId, _host));
-                }
-            }
-            super.finalize();
         }
 
         public long totalBytes(){
@@ -594,6 +553,10 @@ public class DBApiLayer extends DB {
             return _host;
         }
 
+        boolean hasFinalizer() {
+            return _optionalFinalizer != null;
+        }
+
         Response _curResult;
         Iterator<DBObject> _cur;
         int _batchSize;
@@ -607,6 +570,23 @@ public class DBApiLayer extends DB {
         private int _numGetMores = 0;
         private List<Integer> _sizes = new ArrayList<Integer>();
         private int _numFetched = 0;
+
+        // This allows us to easily enable/disable finalizer for cleaning up un-closed cursors
+        private final OptionalFinalizer _optionalFinalizer;
+
+        private class OptionalFinalizer {
+            @Override
+            protected void finalize() {
+                if (_curResult != null) {
+                    long curId = _curResult.cursor();
+                    _curResult = null;
+                    _cur = null;
+                    if (curId != 0) {
+                        _deadCursorIds.add(new DeadCursor(curId, _host));
+                    }
+                }
+            }
+        }
 
     }  // class Result
 
@@ -628,5 +608,4 @@ public class DBApiLayer extends DB {
 
     ConcurrentLinkedQueue<DeadCursor> _deadCursorIds = new ConcurrentLinkedQueue<DeadCursor>();
 
-    static final List<DBObject> EMPTY = Collections.unmodifiableList( new LinkedList<DBObject>() );
 }

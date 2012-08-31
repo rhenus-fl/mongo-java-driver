@@ -16,10 +16,19 @@
 
 package com.mongodb;
 
+import com.mongodb.ReplicaSetStatus.ReplicaSetNode;
 import com.mongodb.util.TestCase;
+
 import org.testng.annotations.Test;
 
 import java.io.IOException;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.HashSet;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Random;
+
 
 /**
  * This is a placeholder. A node needs to be able to be created outside of ReplicaSetStatus.
@@ -42,6 +51,18 @@ public class ReplicaSetStatusTest extends TestCase {
         replicaSetStatus._updater.join(5000);
 
         assertTrue(!replicaSetStatus._updater.isAlive());
+    }
+    
+    @Test
+    public void testSetNames() throws Exception {
+        String replicaSetName = cleanupMongo.getConnector().getReplicaSetStatus().getName();
+        
+        List<ReplicaSetNode> nodes = cleanupMongo.getConnector().getReplicaSetStatus()._replicaSetHolder.get().getAll();
+        
+        for(ReplicaSetNode node : nodes){
+            assertEquals(replicaSetName, node.getSetName());
+        }
+        
     }
 }
 

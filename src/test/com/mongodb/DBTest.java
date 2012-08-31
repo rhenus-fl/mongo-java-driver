@@ -15,18 +15,15 @@
  */
 package com.mongodb;
 
-import java.io.*;
-import java.net.UnknownHostException;
-import java.util.*;
-import java.util.regex.*;
-
+import com.mongodb.util.TestCase;
 import org.testng.annotations.Test;
 
-import com.mongodb.util.*;
+import java.net.UnknownHostException;
+import java.util.Arrays;
 
 public class DBTest extends TestCase {
-    
-    public DBTest() 
+
+    public DBTest()
         throws UnknownHostException {
         super();
 	cleanupMongo = new Mongo( "127.0.0.1" );
@@ -93,6 +90,57 @@ public class DBTest extends TestCase {
         assertFalse(_db.collectionExists( "foo1" ));
     }
 
+    @Test(groups = {"basic"})
+    public void testReadPreferenceObedience() {
+        DBObject obj = new BasicDBObject("mapreduce", 1).append("out", "myColl");
+        assertEquals(ReadPreference.primary(), _db.getCommandReadPreference(obj, ReadPreference.secondary()));
+
+        obj = new BasicDBObject("mapreduce", 1).append("out", new BasicDBObject("replace", "myColl"));
+        assertEquals(ReadPreference.primary(), _db.getCommandReadPreference(obj, ReadPreference.secondary()));
+
+        obj = new BasicDBObject("mapreduce", 1).append("out", new BasicDBObject("inline", 1));
+        assertEquals(ReadPreference.secondary(), _db.getCommandReadPreference(obj, ReadPreference.secondary()));
+
+        obj = new BasicDBObject("mapreduce", 1).append("out", new BasicDBObject("inline", null));
+        assertEquals(ReadPreference.primary(), _db.getCommandReadPreference(obj, ReadPreference.secondary()));
+
+        obj = new BasicDBObject("getnonce", 1);
+        assertEquals(ReadPreference.primaryPreferred(), _db.getCommandReadPreference(obj, ReadPreference.secondary()));
+
+        obj = new BasicDBObject("authenticate", 1);
+        assertEquals(ReadPreference.primaryPreferred(), _db.getCommandReadPreference(obj, ReadPreference.secondary()));
+
+        obj = new BasicDBObject("count", 1);
+        assertEquals(ReadPreference.secondary(), _db.getCommandReadPreference(obj, ReadPreference.secondary()));
+
+        obj = new BasicDBObject("count", 1);
+        assertEquals(ReadPreference.secondary(), _db.getCommandReadPreference(obj, ReadPreference.secondary()));
+
+        obj = new BasicDBObject("serverStatus", 1);
+        assertEquals(ReadPreference.primary(), _db.getCommandReadPreference(obj, ReadPreference.secondary()));
+    }
+
+    @Test(groups = {"basic"})
+    public void testEnsureConnection() throws UnknownHostException {
+
+        Mongo m = new Mongo(Arrays.asList(new ServerAddress("localhost")));
+
+        if (isStandalone(m)) {
+            return;
+        }
+        try {
+            DB db = m.getDB("com_mongodb_unittest_DBTest");
+            db.requestStart();
+            try {
+                db.requestEnsureConnection();
+            } finally {
+                db.requestDone();
+            }
+        } finally {
+            m.close();
+        }
+    }
+
     /*public static class Person extends DBObject {
         
         public Person(){
@@ -134,9 +182,9 @@ public class DBTest extends TestCase {
         assertTrue( out instanceof Person , "didn't come out as Person" );
     }
     */
-    
+
     final DB _db;
-    
+
     public static void main( String args[] )
         throws Exception {
         (new DBTest()).runConsole();

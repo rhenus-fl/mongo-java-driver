@@ -123,8 +123,8 @@ public class TokenConverter {
             DBObject toFields = new BasicDBObject("_id", "toField");
             toFields.putAll(this.mappedTokenToFields);
 
-            mapping.save(toToken);
-            mapping.save(toFields);
+            mapping.save(toToken, WriteConcern.JOURNAL_SAFE);
+            mapping.save(toFields, WriteConcern.JOURNAL_SAFE);
 
             return token;
 

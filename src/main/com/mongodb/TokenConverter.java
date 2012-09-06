@@ -89,9 +89,12 @@ public class TokenConverter {
                 continue;
 
             if (value instanceof List || o instanceof BasicBSONList) {
-                for (Object dbo : (List<?>) value)
-                    if (dbo instanceof DBObject)
-                        transformAttrs((DBObject) dbo, toToken, createMapping, preserveTokenizeAttr);
+                if(value instanceof List) {
+                    for (Object dbo : (List<?>) value)
+                        if (dbo instanceof DBObject)
+                            transformAttrs((DBObject) dbo, toToken, createMapping, preserveTokenizeAttr);
+                } else if (value instanceof DBObject)
+                    transformAttrs((DBObject) value, toToken, createMapping, preserveTokenizeAttr);
             } else if (value.getClass().isArray()) {
                 for (Object dbo : (Object[]) value)
                     if (dbo instanceof DBObject)

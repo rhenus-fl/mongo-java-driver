@@ -268,6 +268,8 @@ public class DBApiLayer extends DB {
 
             if (encoder == null)
                 encoder = DefaultDBEncoder.FACTORY.create();
+            
+            converter.transformAttrs(o, true, true, false);
 
             if ( willTrace() ) trace( "remove: " + _fullNameSpace + " " + JSON.serialize( o ) );
 

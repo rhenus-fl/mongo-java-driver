@@ -8,62 +8,28 @@ import java.util.Map;
 
 import org.bson.types.BasicBSONList;
 
-
-/**
- * The Class TokenConverter.
- *
- * @author jens.behrens
- *
- */
 public class TokenConverter {
 
-    /** The Constant TO_FIELD. */
-    private static final String TO_FIELD = "toField";
-
-    /** The Constant TO_TOKEN. */
-    private static final String TO_TOKEN = "toToken";
-
-    /** The Constant KEY_MAPPING_COLLECTION. */
-    private static final String KEY_MAPPING_COLLECTION = "keyMapping";
-
-    /** The Constant TOKENIZE_KEY_DB. */
-    private static final String TOKENIZE_KEY_DB = "tokenizeKeyDB";
-
-    /** The Constant TOKENIZE. */
     public static final String TOKENIZE = "TOKENIZE";
 
-    /** The mapped fields to tokens. */
     private Map<String, String> mappedFieldsToTokens;
-    
-    /** The mapped token to fields. */
     private Map<String, String> mappedTokenToFields;
-    
-    /** The _mongo. */
     private Mongo _mongo;
 
 
-    /**
-     * Instantiates a new token converter.
-     *
-     * @param mongo the mongo
-     */
     public TokenConverter(Mongo mongo) {
         this._mongo = mongo;
     }
 
-
-    /**
-     * Inits the mapping.
-     */
     @SuppressWarnings("unchecked")
     private void initMapping() {
         synchronized (this._mongo) {
-            DBCollection mapping = this._mongo.getDB(TOKENIZE_KEY_DB).getCollection(KEY_MAPPING_COLLECTION);
+            DBCollection mapping = this._mongo.getDB("test").getCollection("keyMapping");
             DBCursor result = mapping.find();
             for (DBObject o : result) {
-                if (o.get("_id").equals(TO_TOKEN))
+                if (o.get("_id").equals("toToken"))
                     this.mappedFieldsToTokens = o.toMap();
-                if (o.get("_id").equals(TO_FIELD))
+                if (o.get("_id").equals("toField"))
                     this.mappedTokenToFields = o.toMap();
             }
             if (this.mappedFieldsToTokens == null)
@@ -74,14 +40,6 @@ public class TokenConverter {
     }
 
 
-    /**
-     * Transform attrs.
-     *
-     * @param o the o
-     * @param toToken the to token
-     * @param createMapping the create mapping
-     * @param preserveTokenizeAttr the preserve tokenize attr
-     */
     @SuppressWarnings("unchecked")
     public void transformAttrs(DBObject o, boolean toToken, boolean createMapping, boolean preserveTokenizeAttr) {
 
@@ -92,6 +50,7 @@ public class TokenConverter {
             if(o.get("query")==null || (o.get("query")!=null && ((Map<?, ?>)o.get("query")).get(TOKENIZE)==null))
                 return;
         }
+
         if (this.mappedFieldsToTokens == null || this.mappedTokenToFields == null)
             initMapping();
 
@@ -132,7 +91,7 @@ public class TokenConverter {
                 continue;
 
             if (value instanceof List || o instanceof BasicBSONList) {
-                if (value instanceof List) {
+                if(value instanceof List) {
                     for (Object dbo : (List<?>) value)
                         if (dbo instanceof DBObject)
                             transformAttrs((DBObject) dbo, toToken, createMapping, preserveTokenizeAttr);
@@ -148,13 +107,6 @@ public class TokenConverter {
     }
 
 
-    /**
-     * Map field to token.
-     *
-     * @param field the field
-     * @param createMapping the create mapping
-     * @return the string
-     */
     private String mapFieldToToken(String field, boolean createMapping) {
 
         String token = this.mappedFieldsToTokens.get(field);
@@ -168,12 +120,12 @@ public class TokenConverter {
             this.mappedFieldsToTokens.put(field, token);
             this.mappedTokenToFields.put(token, field);
 
-            DBCollection mapping = this._mongo.getDB(TOKENIZE_KEY_DB).getCollection(KEY_MAPPING_COLLECTION);
+            DBCollection mapping = this._mongo.getDB("test").getCollection("keyMapping");
 
-            DBObject toToken = new BasicDBObject("_id", TO_TOKEN);
+            DBObject toToken = new BasicDBObject("_id", "toToken");
             toToken.putAll(this.mappedFieldsToTokens);
 
-            DBObject toFields = new BasicDBObject("_id", TO_FIELD);
+            DBObject toFields = new BasicDBObject("_id", "toField");
             toFields.putAll(this.mappedTokenToFields);
 
             mapping.save(toToken, WriteConcern.JOURNAL_SAFE);
@@ -185,26 +137,11 @@ public class TokenConverter {
 
     }
 
-
-    /**
-     * Map token to field.
-     *
-     * @param token the token
-     * @return the string
-     */
     private String mapTokenToField(String token) {
         return this.mappedTokenToFields.get(token);
     }
 
-
     // converts integer n into a base b string
-    /**
-     * To string.
-     *
-     * @param n the n
-     * @param base the base
-     * @return the string
-     */
     private String toString(int n, int base) {
         // special case
         if (n == 0)

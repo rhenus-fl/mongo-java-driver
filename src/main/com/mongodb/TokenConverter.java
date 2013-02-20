@@ -88,9 +88,10 @@ public class TokenConverter {
         if (o == null)
             return;
 
-        if (!(o instanceof BasicBSONList) && o.get(TOKENIZE) == null)
-            return;
-
+        if (!(o instanceof BasicBSONList) && o.get(TOKENIZE) == null) {
+            if(o.get("query")==null || (o.get("query")!=null && ((Map<?, ?>)o.get("query")).get(TOKENIZE)==null))
+                return;
+        }
         if (this.mappedFieldsToTokens == null || this.mappedTokenToFields == null)
             initMapping();
 

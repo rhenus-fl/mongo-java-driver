@@ -325,6 +325,10 @@ public class DBApiLayer extends DB {
             if (encoder == null)
                 encoder = DefaultDBEncoder.FACTORY.create();
 
+//            if (query != null) {
+//                converter.transformAttrs(query, true, false, false);
+//            }
+            
             if (!o.keySet().isEmpty()) {
                 converter.transformAttrs(o, true, true, false);
                 

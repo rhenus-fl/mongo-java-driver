@@ -24,7 +24,7 @@ public class TokenConverter {
     @SuppressWarnings("unchecked")
     private void initMapping() {
         synchronized (this._mongo) {
-            DBCollection mapping = this._mongo.getDB("test").getCollection("keyMapping");
+            DBCollection mapping = this._mongo.getDB("tokenizeKeyDB").getCollection("keyMapping");
             DBCursor result = mapping.find();
             for (DBObject o : result) {
                 if (o.get("_id").equals("toToken"))
@@ -120,7 +120,7 @@ public class TokenConverter {
             this.mappedFieldsToTokens.put(field, token);
             this.mappedTokenToFields.put(token, field);
 
-            DBCollection mapping = this._mongo.getDB("test").getCollection("keyMapping");
+            DBCollection mapping = this._mongo.getDB("tokenizeKeyDB").getCollection("keyMapping");
 
             DBObject toToken = new BasicDBObject("_id", "toToken");
             toToken.putAll(this.mappedFieldsToTokens);

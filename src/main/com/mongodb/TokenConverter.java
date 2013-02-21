@@ -24,7 +24,7 @@ public class TokenConverter {
     @SuppressWarnings("unchecked")
     private void initMapping() {
         synchronized (this._mongo) {
-            DBCollection mapping = this._mongo.getDB("test").getCollection("keyMapping");
+            DBCollection mapping = this._mongo.getDB("tokenizeKeyDB").getCollection("keyMapping");
             DBCursor result = mapping.find();
             for (DBObject o : result) {
                 if (o.get("_id").equals("toToken"))

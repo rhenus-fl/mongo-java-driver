@@ -107,7 +107,7 @@ public class TokenConverter {
     }
 
 
-    private String mapFieldToToken(String field, boolean createMapping) {
+    public String mapFieldToToken(String field, boolean createMapping) {
 
         String token = this.mappedFieldsToTokens.get(field);
         if (token == null && !createMapping)

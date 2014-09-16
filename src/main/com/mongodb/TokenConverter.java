@@ -22,7 +22,7 @@ public class TokenConverter {
     }
 
     @SuppressWarnings("unchecked")
-    private void initMapping() {
+    public void initMapping() {
         synchronized (this._mongo) {
             DBCollection mapping = this._mongo.getDB("tokenizeKeyDB").getCollection("keyMapping");
             DBCursor result = mapping.find();
@@ -107,7 +107,7 @@ public class TokenConverter {
     }
 
 
-    private String mapFieldToToken(String field, boolean createMapping) {
+    public String mapFieldToToken(String field, boolean createMapping) {
 
         String token = this.mappedFieldsToTokens.get(field);
         if (token == null && !createMapping)

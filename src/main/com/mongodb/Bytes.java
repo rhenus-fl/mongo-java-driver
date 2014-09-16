@@ -31,7 +31,7 @@ import org.bson.types.CodeWScope;
 import org.bson.types.ObjectId;
 
 /**
- * Class that hold definitions of the wire protocol
+ * Class that hold definitions of the wire protocol...
  * @author antoine
  */
 public class Bytes extends BSON {
